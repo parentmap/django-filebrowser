@@ -9,9 +9,13 @@ from tempfile import NamedTemporaryFile
 from django.utils.translation import ugettext as _
 from django.core.files import File
 from django.utils.encoding import smart_unicode
+from django.core.urlresolvers import reverse
 
 # filebrowser imports
 from filebrowser.settings import *
+
+# import from main app
+from handler.templatetags import staticlink
 
 # PIL import
 if STRICT_PIL:
@@ -274,92 +278,16 @@ def is_selectable(filename, selecttype):
 
 def version_generator(value, version_prefix, force=None, site=None):
     """
-    Generate Version for an Image.
-    value has to be a serverpath relative to MEDIA_ROOT.
+    Just generate a link to our dynamic version generator
     """
-    
-    # PIL's Error "Suspension not allowed here" work around:
-    # s. http://mail.python.org/pipermail/image-sig/1999-August/000816.html
-    if STRICT_PIL:
-        from PIL import ImageFile
-    else:
-        try:
-            from PIL import ImageFile
-        except ImportError:
-            import ImageFile
-    ImageFile.MAXBLOCK = IMAGE_MAXBLOCK # default is 64k
-    if not site:
-        from filebrowser.sites import site as default_site
-        site = default_site
-    tmpfile = File(NamedTemporaryFile())
-    try:
-        f = site.storage.open(value)
-        im = Image.open(f)
-        version_path = get_version_path(value, version_prefix, site=site)
-        version_dir, version_basename = os.path.split(version_path)
-        root, ext = os.path.splitext(version_basename)
-        version = scale_and_crop(im, VERSIONS[version_prefix]['width'], VERSIONS[version_prefix]['height'], VERSIONS[version_prefix]['opts'])
-        if not version:
-            version = im
-        if 'methods' in VERSIONS[version_prefix].keys():
-            for m in VERSIONS[version_prefix]['methods']:
-                if callable(m):
-                    version = m(version)
-        try:
-            version.save(tmpfile, format=Image.EXTENSION[ext], quality=VERSION_QUALITY, optimize=(os.path.splitext(version_path)[1].lower() != '.gif'))
-        except IOError:
-            version.save(tmpfile, format=Image.EXTENSION[ext], quality=VERSION_QUALITY)
-        # Remove the old version, if there's any
-        if version_path != site.storage.get_available_name(version_path):
-            site.storage.delete(version_path)
-        site.storage.save(version_path, tmpfile)
-        return version_path
-    except:
-        return None
-    finally:
-        tmpfile.close()
-        try:
-            f.close()
-        except:
-            pass
+    return '%s?width=%s;' % (
+        reverse('scale', kwargs={
+            'mtime': staticlink.mtime(value),
+            'path': value
+            }),
+        VERSIONS[version_prefix]['width'],
+        )
 
-def scale_and_crop(im, width, height, opts):
-    """
-    Scale and Crop.
-    """
-    
-    x, y   = [float(v) for v in im.size]
-    
-    if 'upscale' not in opts and x < width:
-        # version would be bigger than original
-        # no need to create this version, because "upscale" isn't defined.
-        return False
-    
-    if width:
-        xr = float(width)
-    else:
-        xr = float(x*height/y)
-    if height:
-        yr = float(height)
-    else:
-        yr = float(y*width/x)
-    
-    if 'crop' in opts:
-        r = max(xr/x, yr/y)
-    else:
-        r = min(xr/x, yr/y)
-    
-    if r < 1.0 or (r > 1.0 and 'upscale' in opts):
-        im = im.resize((int(x*r), int(y*r)), resample=Image.ANTIALIAS)
-    
-    if 'crop' in opts:
-        x, y   = [float(v) for v in im.size]
-        ex, ey = (x-min(x, xr))/2, (y-min(y, yr))/2
-        if ex or ey:
-            im = im.crop((int(ex), int(ey), int(x-ex), int(y-ey)))
-    return im
-    
-scale_and_crop.valid_options = ('crop', 'upscale')
 
 
 def convert_filename(value):

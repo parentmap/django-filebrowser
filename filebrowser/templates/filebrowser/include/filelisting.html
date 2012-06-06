@@ -85,6 +85,19 @@
             </td>
         {% endif %}
         
+        <!-- FILESELECT FOR FILEBROWSEFIELD -->
+        {% if query.pop == "4" %}
+            <td class="fb_icon">
+                {% selectable fileobject.filetype query.type %}
+                {% if selectable %}
+                    <!-- select original -->
+                    <button class="button fb_selectlink" onclick="top.window.fileBrowserCallback('{{ fileobject.path }}', '{{ fileobject.url }}', '{{ thumbnail_version.url }}', '{{ fileobject.filetype }}');">{% trans "Select" %}</button>
+                {% else %}
+                    &nbsp;
+                {% endif %}
+            </td>
+        {% endif %}
+        
         <!-- FILEICON -->
         <td>
             {% if fileobject.filetype %}

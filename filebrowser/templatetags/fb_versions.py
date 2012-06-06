@@ -13,7 +13,7 @@ from django.core.files import File
 
 # FILEBROWSER IMPORTS
 from filebrowser.settings import DIRECTORY, VERSIONS, PLACEHOLDER, SHOW_PLACEHOLDER, FORCE_PLACEHOLDER
-from filebrowser.functions import get_version_path, version_generator
+from filebrowser.functions import version_generator
 from filebrowser.base import FileObject
 from filebrowser.sites import get_default_site
 register = Library()
@@ -53,12 +53,8 @@ class VersionNode(Node):
                 source = PLACEHOLDER
             elif SHOW_PLACEHOLDER and not site.storage.isfile(source):
                 source = PLACEHOLDER
-            version_path = get_version_path(source, version_prefix, site=site)
-            if not site.storage.isfile(version_path):
-                version_path = version_generator(source, version_prefix, site=site)
-            elif site.storage.modified_time(source) > site.storage.modified_time(version_path):
-                version_path = version_generator(source, version_prefix, force=True, site=site)
-            return site.storage.url(version_path)
+            version_path = version_generator(source, version_prefix, site=site)
+            return version_path
         except:
             return ""
 
@@ -118,16 +114,25 @@ class VersionObjectNode(Node):
                 source = PLACEHOLDER
             elif SHOW_PLACEHOLDER and not site.storage.isfile(source):
                 source = PLACEHOLDER
-            version_path = get_version_path(source, version_prefix, site=site)
-            if not site.storage.isfile(version_path):
-                version_path = version_generator(source, version_prefix, site=site)
-            elif site.storage.modified_time(source) > site.storage.modified_time(version_path):
-                version_path = version_generator(source, version_prefix, force=True, site=site)
-            context[self.var_name] = FileObject(version_path, site=site)
+            version_path = version_generator(source, version_prefix, site=site)
+            context[self.var_name] = PseudoFileObject(version_path,)
         except:
             context[self.var_name] = ""
         return ''
 
+from django.utils.safestring import mark_safe
+
+class PseudoFileObject(object):
+
+    def __init__(self, path):
+        self.path = path
+
+    def __str__(self):
+        return self.path
+
+    @property
+    def url(self):
+        return mark_safe(self.path)
 
 def version_object(parser, token):
     """
